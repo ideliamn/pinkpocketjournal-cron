@@ -1,7 +1,6 @@
 import cron from "node-cron";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
-// import { generateBills } from "./services/recurring";
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -10,7 +9,7 @@ const supabase = createClient(
 
 // 1 0 * * * (at 00.01)
 // * * * * * (every minute)
-cron.schedule("* * * * *", async () => {
+cron.schedule("1 0 * * *", async () => {
     console.log("⏰ Running scheduled job:", new Date().toISOString());
     const todayDate = new Date();
     const today = todayDate.toISOString().split("T")[0];
@@ -70,9 +69,7 @@ cron.schedule("* * * * *", async () => {
         const { data: insertBill, error: errorInsertBill } = await supabase
             .from("bills")
             .insert(addNewBills);
-
         console.log("Success insert bill: ", insertBill)
-
         if (errorInsertBill) {
             console.error("error insert bill:", errorInsertBill);
         }
