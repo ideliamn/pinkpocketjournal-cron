@@ -19,6 +19,7 @@ cron.schedule("1 0 * * *", async () => {
         .update({ status: "overdue" })
         .lt("due_date", today)
         .eq("status", "pending")
+        .is("last_recurred_at", null);
 
     if (!updateBill) {
         console.log("No overdue pending bills found!")
@@ -30,7 +31,13 @@ cron.schedule("1 0 * * *", async () => {
         console.error("Error update bill:", errorUpdateBill);
     }
 
-    const { data: bills, error: errorGetBills } = await supabase.from("bills").select("*").lt("due_date", today);
+    const { data: bills, error: errorGetBills } = await supabase
+        .from("bills")
+        .select("*")
+        .lt("due_date", today)
+        .not("recurrence_interval", "eq", "none")
+        .eq("status", "overdue")
+        .is("last_recurred_at", null);
 
     if (errorGetBills) {
         console.error("Error get bills:", errorGetBills);
@@ -41,7 +48,6 @@ cron.schedule("1 0 * * *", async () => {
     }
 
     const addNewBills = bills
-        .filter((b) => b.recurrence_interval && b.recurrence_interval !== "none")
         .map((b) => {
             const oldDueDate = new Date(b.due_date);
             let newDueDate = null;
@@ -61,7 +67,7 @@ cron.schedule("1 0 * * *", async () => {
                 amount: b.amount,
                 due_date: newDueDate?.toISOString().split("T")[0] ?? null,
                 recurrence_interval: b.recurrence_interval,
-                status: "pending"
+                status: "pending",
             }
         });
 
@@ -72,6 +78,17 @@ cron.schedule("1 0 * * *", async () => {
         console.log("Success insert bill: ", insertBill)
         if (errorInsertBill) {
             console.error("error insert bill:", errorInsertBill);
+        }
+        const { error: errorUpdateLast } = await supabase
+            .from("bills")
+            .update({ last_recurred_at: today })
+            .lt("due_date", today)
+            .eq("status", "overdue")
+            .is("last_recurred_at", null);
+        if (errorUpdateLast) {
+            console.error("Error update last_recurred_at:", errorUpdateLast);
+        } else {
+            console.log("Updated last_recurred_at for overdue bills!");
         }
     } else {
         console.log("No recurring overdue bills found!")
